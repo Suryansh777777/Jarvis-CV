@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useEffect, useRef } from "react";
 import { useStore, GestureType } from "@/store/useStore";
 import {
@@ -225,6 +227,31 @@ export default function WebcamProcessor() {
 
         // Center Line
         connect(10, 152);
+
+        // Eye Visors
+        // Left Eye Loop (approximate)
+        ctx.beginPath();
+        [33, 160, 158, 133, 153, 144].forEach((idx, i) => {
+          const p = landmarks[idx];
+          const x = p.x * ctx.canvas.width;
+          const y = p.y * ctx.canvas.height;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        ctx.stroke();
+
+        // Right Eye Loop
+        ctx.beginPath();
+        [362, 385, 387, 263, 373, 380].forEach((idx, i) => {
+          const p = landmarks[idx];
+          const x = p.x * ctx.canvas.width;
+          const y = p.y * ctx.canvas.height;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        ctx.stroke();
 
         // Bounding Box / Target Lock
         const x = landmarks[234].x * ctx.canvas.width; // Left cheek
