@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+:root {
+  --foreground-rgb: 0, 255, 255;
+  --background-start-rgb: 0, 5, 16;
+  --background-end-rgb: 0, 0, 0;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: radial-gradient(
+      circle at center,
+      rgb(var(--background-start-rgb)) 0%,
+      rgb(var(--background-end-rgb)) 100%
+    );
+  overflow: hidden;
+  font-family: 'Courier New', Courier, monospace; /* Fallback until I load a better one */
+}
+
+@layer utilities {
+  .text-glow {
+    text-shadow: 0 0 5px rgba(0, 255, 255, 0.7), 0 0 10px rgba(0, 255, 255, 0.5);
+  }
+  .border-glow {
+    box-shadow: 0 0 5px rgba(0, 255, 255, 0.5), inset 0 0 5px rgba(0, 255, 255, 0.2);
+  }
+}
