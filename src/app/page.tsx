@@ -1,21 +1,20 @@
 import WebcamProcessor from "@/components/WebcamProcessor";
 import GlobeScene from "@/components/GlobeScene";
 import HUD from "@/components/HUD";
+import HandUI from "@/components/HandUI";
 
 export default function Home() {
   return (
     <main className="relative w-screen h-screen overflow-hidden bg-black">
-      {/* Background: Webcam Feed & Gesture Visualization */}
+      {/* Background: Webcam Feed */}
       <WebcamProcessor />
 
-      {/* Middle Layer: 3D Globe */}
+      {/* Middle Layer: 3D Hologram (Arc Reactor) */}
       <GlobeScene />
 
-      {/* Top Layer: UI HUD */}
+      {/* Top Layer: HUD & Hand Interactions */}
       <HUD />
-
-      {/* Vignette Effect for cinematic look */}
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)]" />
+      <HandUI />
     </main>
   );
 }

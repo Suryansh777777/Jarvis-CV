@@ -4,24 +4,58 @@
   --foreground-rgb: 0, 255, 255;
   --background-start-rgb: 0, 5, 16;
   --background-end-rgb: 0, 0, 0;
+  --neon-blue: #00f3ff;
+  --neon-cyan: #0ff;
+  --holo-bg: rgba(0, 20, 40, 0.3);
+}
+
+@theme {
+  --font-rajdhani: var(--font-rajdhani);
+  --font-share-tech: var(--font-share-tech);
 }
 
 body {
   color: rgb(var(--foreground-rgb));
-  background: radial-gradient(
-      circle at center,
-      rgb(var(--background-start-rgb)) 0%,
-      rgb(var(--background-end-rgb)) 100%
-    );
+  background: black;
   overflow: hidden;
-  font-family: 'Courier New', Courier, monospace; /* Fallback until I load a better one */
+  font-family: var(--font-rajdhani), sans-serif;
 }
 
 @layer utilities {
-  .text-glow {
-    text-shadow: 0 0 5px rgba(0, 255, 255, 0.7), 0 0 10px rgba(0, 255, 255, 0.5);
+  .font-tech {
+    font-family: var(--font-share-tech), monospace;
   }
+  
+  .text-glow {
+    text-shadow: 0 0 5px rgba(0, 243, 255, 0.7), 0 0 10px rgba(0, 243, 255, 0.5);
+  }
+  
+  .text-glow-sm {
+    text-shadow: 0 0 2px rgba(0, 243, 255, 0.7);
+  }
+
   .border-glow {
-    box-shadow: 0 0 5px rgba(0, 255, 255, 0.5), inset 0 0 5px rgba(0, 255, 255, 0.2);
+    box-shadow: 0 0 10px rgba(0, 243, 255, 0.3), inset 0 0 5px rgba(0, 243, 255, 0.1);
+    border: 1px solid rgba(0, 243, 255, 0.5);
+  }
+
+  .holographic-panel {
+    background: rgba(0, 20, 40, 0.4);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(0, 243, 255, 0.3);
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.1);
+  }
+
+  .clip-corner-tr {
+    clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%);
+  }
+  
+  .clip-corner-bl {
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 20px 100%, 0 calc(100% - 20px));
+  }
+
+  .scanline {
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+    background-size: 100% 4px;
   }
 }

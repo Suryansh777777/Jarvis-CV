@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useStore } from "@/store/useStore";
+import { useEffect, useRef } from "react";
+import { useStore, GestureType } from "@/store/useStore";
 import type { Results as HandsResults } from "@mediapipe/hands";
 import type { Results as FaceMeshResults } from "@mediapipe/face_mesh";
 
@@ -9,7 +9,15 @@ export default function WebcamProcessor() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
-  const { setFaceLandmarks, setHands, setGlobeRotation, setGlobeScale, globeRotation, globeScale } = useStore();
+  const { 
+    setFaceLandmarks, 
+    setHands, 
+    setGestures,
+    setGlobeRotation, 
+    setGlobeScale, 
+    updateHandUI,
+    globeScale 
+  } = useStore();
   
   // Gesture state tracking
   const prevHandPos = useRef<{ x: number; y: number } | null>(null);
@@ -31,9 +39,8 @@ export default function WebcamProcessor() {
 
       // Dynamic imports
       const { Camera } = await import("@mediapipe/camera_utils");
-      const { Hands, HAND_CONNECTIONS } = await import("@mediapipe/hands");
+      const { Hands } = await import("@mediapipe/hands");
       const { FaceMesh } = await import("@mediapipe/face_mesh");
-      const { drawConnectors, drawLandmarks } = await import("@mediapipe/drawing_utils");
 
       // Initialize Hands
       hands = new Hands({
@@ -45,8 +52,8 @@ export default function WebcamProcessor() {
       hands.setOptions({
         maxNumHands: 2,
         modelComplexity: 1,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.6,
       });
 
       hands.onResults(onHandsResults);
@@ -91,33 +98,102 @@ export default function WebcamProcessor() {
         if (!canvasCtx) return;
         canvasCtx.save();
         canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        
+        // Draw only the video feed (clean look)
         canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
         let leftHand = null;
         let rightHand = null;
+        let leftGesture: GestureType = 'IDLE';
+        let rightGesture: GestureType = 'IDLE';
 
         if (results.multiHandLandmarks) {
           for (const [index, landmarks] of results.multiHandLandmarks.entries()) {
-            // Draw landmarks
-            drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
-            drawLandmarks(canvasCtx, landmarks, { color: '#FF0000', lineWidth: 1, radius: 3 });
-
-            // Determine handedness
             const label = results.multiHandedness[index]?.label;
+            const gesture = detectGesture(landmarks);
             
-            if (label === 'Left') leftHand = landmarks;
-            if (label === 'Right') rightHand = landmarks;
+            // Update Hand UI Position (Palm Center)
+            // Landmark 9 is the middle finger knuckle, usually stable center of palm
+            const palmX = landmarks[9].x;
+            const palmY = landmarks[9].y;
+
+            if (label === 'Left') {
+              leftHand = landmarks;
+              leftGesture = gesture;
+              updateHandUI('left', { 
+                visible: true, 
+                x: palmX, 
+                y: palmY,
+                gesture: gesture
+              });
+            }
+            if (label === 'Right') {
+              rightHand = landmarks;
+              rightGesture = gesture;
+              updateHandUI('right', { 
+                visible: true, 
+                x: palmX, 
+                y: palmY,
+                gesture: gesture
+              });
+            }
           }
         }
 
+        // Hide UI if hand lost
+        if (!leftHand) updateHandUI('left', { visible: false });
+        if (!rightHand) updateHandUI('right', { visible: false });
+
         setHands(leftHand, rightHand);
-        processGestures(leftHand, rightHand);
+        setGestures(leftGesture, rightGesture);
+        processInteraction(leftHand, rightHand, leftGesture, rightGesture);
         
         canvasCtx.restore();
       }
 
-      function processGestures(left: any[] | null, right: any[] | null) {
-        // 1. Scaling: Both hands available
+      function detectGesture(landmarks: any[]): GestureType {
+        const thumbTip = landmarks[4];
+        const indexTip = landmarks[8];
+        const middleTip = landmarks[12];
+        const ringTip = landmarks[16];
+        const pinkyTip = landmarks[20];
+        
+        const wrist = landmarks[0];
+
+        // Helper to check if finger is extended (tip further from wrist than PIP)
+        const isExtended = (tip: any, pip: number) => {
+            const pipMark = landmarks[pip];
+            return Math.hypot(tip.x - wrist.x, tip.y - wrist.y) > Math.hypot(pipMark.x - wrist.x, pipMark.y - wrist.y);
+        };
+
+        const indexExt = isExtended(indexTip, 6);
+        const middleExt = isExtended(middleTip, 10);
+        const ringExt = isExtended(ringTip, 14);
+        const pinkyExt = isExtended(pinkyTip, 18);
+
+        // Distance between thumb and index
+        const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+
+        if (pinchDist < 0.05) return 'PINCH';
+        
+        if (indexExt && middleExt && ringExt && pinkyExt) return 'PALM_OPEN';
+        
+        if (!indexExt && !middleExt && !ringExt && !pinkyExt) return 'GRAB';
+        
+        if (indexExt && !middleExt && !ringExt && !pinkyExt) return 'POINT';
+        
+        if (indexExt && middleExt && !ringExt && !pinkyExt) return 'VICTORY';
+
+        return 'IDLE';
+      }
+
+      function processInteraction(
+        left: any[] | null, 
+        right: any[] | null, 
+        leftGesture: GestureType, 
+        rightGesture: GestureType
+      ) {
+        // 1. Scaling with two hands (Pinch or Open Palm)
         if (left && right) {
           const leftIndex = left[8];
           const rightIndex = right[8];
@@ -126,7 +202,6 @@ export default function WebcamProcessor() {
           if (prevPinchDist.current !== null) {
             const delta = dist - prevPinchDist.current;
             if (Math.abs(delta) > 0.01) {
-              // Scale factor
                setGlobeScale(Math.max(0.5, Math.min(3, useStore.getState().globeScale + delta * 2)));
             }
           }
@@ -135,33 +210,25 @@ export default function WebcamProcessor() {
           prevPinchDist.current = null;
         }
 
-        // 2. Rotation: Using Right Hand
-        const activeHand = right || left; 
+        // 2. Rotation with 'GRAB' gesture (Right Hand primarily)
+        const activeHand = rightGesture === 'GRAB' ? right : (leftGesture === 'GRAB' ? left : null);
+        
         if (activeHand) {
-          const thumbTip = activeHand[4];
-          const middleTip = activeHand[12];
-          
-          // Check for "grab"
-          const grabDist = Math.hypot(thumbTip.x - middleTip.x, thumbTip.y - middleTip.y);
-          const isGrabbing = grabDist < 0.1;
+          const centroid = { x: activeHand[9].x, y: activeHand[9].y };
 
-          if (isGrabbing) {
-            const centroid = { x: activeHand[9].x, y: activeHand[9].y }; // Wrist/Palm area
-
-            if (prevHandPos.current) {
-              const deltaX = centroid.x - prevHandPos.current.x;
-              const deltaY = centroid.y - prevHandPos.current.y;
-              
-              const currentRot = useStore.getState().globeRotation;
-              setGlobeRotation({
-                x: currentRot.x + deltaY * 5,
-                y: currentRot.y + deltaX * 5
-              });
-            }
-            prevHandPos.current = centroid;
-          } else {
-            prevHandPos.current = null;
+          if (prevHandPos.current) {
+            const deltaX = centroid.x - prevHandPos.current.x;
+            const deltaY = centroid.y - prevHandPos.current.y;
+            
+            const currentRot = useStore.getState().globeRotation;
+            setGlobeRotation({
+              x: currentRot.x + deltaY * 5,
+              y: currentRot.y + deltaX * 5
+            });
           }
+          prevHandPos.current = centroid;
+        } else {
+          prevHandPos.current = null;
         }
       }
     };
@@ -169,8 +236,6 @@ export default function WebcamProcessor() {
     initMediaPipe();
 
     return () => {
-      // Cleanup not easily possible with MediaPipe instances as they don't have stop/dispose readily available 
-      // in all versions, but camera.stop() exists.
       if (camera) camera.stop();
       if (hands) hands.close();
       if (faceMesh) faceMesh.close();
@@ -179,10 +244,7 @@ export default function WebcamProcessor() {
 
   return (
     <div className="fixed inset-0 z-0">
-      {/* Hidden Video for MediaPipe */}
       <video ref={videoRef} className="hidden" playsInline />
-      
-      {/* Canvas for visualization (mirrored) */}
       <canvas 
         ref={canvasRef} 
         className="absolute inset-0 w-full h-full object-cover -scale-x-100"
