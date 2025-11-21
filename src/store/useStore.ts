@@ -97,9 +97,9 @@ export const useStore = create<StoreState>((set) => ({
   setGlobeRotation: (rotation) => set({ globeRotation: rotation }),
   setGlobeScale: (scale) => set({ globeScale: scale }),
   nextScene: () =>
-    set((state) => ({ activeScene: (state.activeScene + 1) % 3 })),
+    set((state) => ({ activeScene: (state.activeScene + 1) % 4 })),
   prevScene: () =>
-    set((state) => ({ activeScene: (state.activeScene - 1 + 3) % 3 })),
+    set((state) => ({ activeScene: (state.activeScene - 1 + 4) % 4 })),
   updateHUD: (updates) =>
     set((state) => ({ hudState: { ...state.hudState, ...updates } })),
   updateHandUI: (hand, data) =>

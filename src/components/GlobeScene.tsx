@@ -5,6 +5,8 @@ import { useRef } from "react";
 import { Mesh, Group } from "three";
 import { useStore } from "@/store/useStore";
 import { Sphere, Torus, Ring, Icosahedron } from "@react-three/drei";
+import { DynamicNetwork } from "@/components/NeuralNetwork";
+import { EffectComposer, Bloom } from "@react-three/postprocessing";
 
 function useResponsivePositionAndScale() {
   const { size } = useThree();
@@ -208,6 +210,39 @@ function SolarSystem({ active }: { active: boolean }) {
   );
 }
 
+// --- Scene 3: Dynamic 3D Network ---
+function NetworkScene({ active }: { active: boolean }) {
+  const groupRef = useRef<Group>(null);
+  const { globeRotation, globeScale } = useStore();
+  const { position, scale: mobileScale } = useResponsivePositionAndScale();
+
+  useFrame(() => {
+    if (!groupRef.current) return;
+
+    // Rotation is handled inside DynamicNetwork mostly, but we can add global container rotation
+    groupRef.current.rotation.x = globeRotation.x * 0.3;
+    groupRef.current.rotation.y = globeRotation.y * 0.3;
+
+    // Scale transition
+    const baseScale = 0.4;
+    const targetScale = active ? globeScale * mobileScale * baseScale : 0;
+
+    groupRef.current.scale.lerp(
+      { x: targetScale, y: targetScale, z: targetScale },
+      0.1
+    );
+    groupRef.current.visible = groupRef.current.scale.x > 0.01;
+  });
+
+  return (
+    // @ts-expect-error - position type mismatch
+    <group ref={groupRef} position={position}>
+      {/* Use default theme and density for the carousel view */}
+      <DynamicNetwork active={active} themeKey="CYBER" density={1.0} />
+    </group>
+  );
+}
+
 export default function GlobeScene() {
   const { activeScene } = useStore();
 
@@ -215,7 +250,11 @@ export default function GlobeScene() {
     <div className="absolute inset-0 z-10 pointer-events-none">
       <Canvas
         camera={{ position: [0, 0, 6], fov: 45 }}
-        gl={{ antialias: true, alpha: true }}
+        gl={{
+          antialias: false, // Handled by postprocessing or not needed with bloom
+          alpha: true,
+          powerPreference: "high-performance",
+        }}
       >
         <ambientLight intensity={0.5} />
         <pointLight position={[10, 10, 10]} intensity={1} />
@@ -224,6 +263,16 @@ export default function GlobeScene() {
         <ArcReactor active={activeScene === 0} />
         <EarthScene active={activeScene === 1} />
         <SolarSystem active={activeScene === 2} />
+        <NetworkScene active={activeScene === 3} />
+
+        <EffectComposer>
+          <Bloom
+            luminanceThreshold={0.2} // Higher threshold to avoid blooming everything
+            mipmapBlur
+            intensity={1.5}
+            radius={0.4}
+          />
+        </EffectComposer>
       </Canvas>
     </div>
   );
