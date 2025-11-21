@@ -393,8 +393,8 @@ export default function WebcamProcessor() {
 
             const currentRot = useStore.getState().globeRotation;
             setGlobeRotation({
-              x: currentRot.x + deltaY * 5,
-              y: currentRot.y + deltaX * 5,
+              x: currentRot.x + deltaY * 8,
+              y: currentRot.y + deltaX * 8,
             });
           }
           prevHandPos.current = centroid;

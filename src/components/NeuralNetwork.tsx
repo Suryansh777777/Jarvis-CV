@@ -11,7 +11,7 @@ const MAX_PULSES = 10;
 const PULSE_SPEED = 4.0; // Units per second
 const PULSE_WIDTH = 1.5;
 
-const THEMES = {
+export const THEMES = {
   CYBER: {
     name: "Cyberpunk",
     bg: "#000000",
@@ -137,10 +137,14 @@ export function DynamicNetwork({
   themeKey = "CYBER",
   density = 1.0,
   active = true,
+  rotation = { x: 0, y: 0 },
+  scale = 1.0,
 }: {
   themeKey?: ThemeKey;
   density?: number; // 0.5 to 2.0
   active?: boolean;
+  rotation?: { x: number; y: number };
+  scale?: number;
 }) {
   // 1. Generate Geometry
   const { positions, indices } = useMemo(() => {
@@ -218,9 +222,13 @@ export function DynamicNetwork({
     if (groupRef.current) {
       groupRef.current.visible = active;
       if (active) {
-        groupRef.current.rotation.y += delta * 0.05;
+        // Auto-rotation combined with gesture rotation
+        groupRef.current.rotation.y = rotation.y + state.clock.elapsedTime * 0.05;
+        groupRef.current.rotation.x = rotation.x;
+        groupRef.current.scale.setScalar(scale);
       }
     }
+    if (!active) return;
     if (!active) return;
 
     const time = state.clock.elapsedTime;
@@ -277,7 +285,7 @@ export function DynamicNetwork({
 }
 
 // --- Controls UI ---
-function Controls({
+export function Controls({
   theme,
   setTheme,
   density,
@@ -350,7 +358,7 @@ export default function DynamicNetworkCanvas() {
   const [density, setDensity] = useState(1.0);
 
   return (
-    <div className="relative w-full h-screen bg-black overflow-hidden">
+    <div className="relative w-full h-screen overflow-hidden">
       {/* Background Color Transition */}
       <div
         className="absolute inset-0 transition-colors duration-1000 pointer-events-none"
