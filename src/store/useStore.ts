@@ -43,6 +43,7 @@ interface StoreState {
 
   // Globe State
   globeRotation: { x: number; y: number };
+  globeCenter: { lat: number; lng: number };
   globeScale: number;
   activeScene: number;
 
@@ -59,11 +60,16 @@ interface StoreState {
   theme: "CYBER" | "SOLAR" | "MATRIX" | "FROST";
   pulseTrigger: number; // Timestamp
 
+  // Overwatch State
+  timeSpeed: number;
+  isManipulatingTime: boolean;
+
   // Actions
   setFaceLandmarks: (landmarks: FaceLandmark[] | null) => void;
   setHands: (left: HandLandmark[] | null, right: HandLandmark[] | null) => void;
   setGestures: (left: GestureType, right: GestureType) => void;
   setGlobeRotation: (rotation: { x: number; y: number }) => void;
+  setGlobeCenter: (center: { lat: number; lng: number }) => void;
   setGlobeScale: (scale: number) => void;
   nextScene: () => void;
   prevScene: () => void;
@@ -74,6 +80,10 @@ interface StoreState {
   setTheme: (theme: "CYBER" | "SOLAR" | "MATRIX" | "FROST") => void;
   cycleTheme: () => void;
   triggerPulse: () => void;
+
+  // Overwatch Actions
+  setTimeSpeed: (speed: number) => void;
+  setIsManipulatingTime: (isManipulating: boolean) => void;
 }
 
 const THEME_ORDER = ["CYBER", "SOLAR", "MATRIX", "FROST"] as const;
@@ -87,6 +97,7 @@ export const useStore = create<StoreState>((set) => ({
   rightGesture: "IDLE",
 
   globeRotation: { x: 0, y: 0 },
+  globeCenter: { lat: 19.0760, lng: 72.8777 }, // Mumbai Default
   globeScale: 1.5,
   activeScene: 0,
 
@@ -106,10 +117,15 @@ export const useStore = create<StoreState>((set) => ({
   theme: "CYBER",
   pulseTrigger: 0,
 
+  // Overwatch Defaults
+  timeSpeed: 1.0,
+  isManipulatingTime: false,
+
   setFaceLandmarks: (landmarks) => set({ faceLandmarks: landmarks }),
   setHands: (left, right) => set({ leftHand: left, rightHand: right }),
   setGestures: (left, right) => set({ leftGesture: left, rightGesture: right }),
   setGlobeRotation: (rotation) => set({ globeRotation: rotation }),
+  setGlobeCenter: (center) => set({ globeCenter: center }),
   setGlobeScale: (scale) => set({ globeScale: scale }),
   nextScene: () =>
     set((state) => ({ activeScene: (state.activeScene + 1) % 4 })),
@@ -132,4 +148,7 @@ export const useStore = create<StoreState>((set) => ({
     return { theme: THEME_ORDER[nextIndex] };
   }),
   triggerPulse: () => set({ pulseTrigger: Date.now() }),
+
+  setTimeSpeed: (speed) => set({ timeSpeed: speed }),
+  setIsManipulatingTime: (isManipulating) => set({ isManipulatingTime: isManipulating }),
 }));
