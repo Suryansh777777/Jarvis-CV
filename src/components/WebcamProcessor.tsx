@@ -262,7 +262,7 @@ export default React.memo(function WebcamProcessor({ className = "fixed inset-0 
                  // Micro-Precision Dampening (City View)
                  // If zoomed in (scale > 1.5), dampen significantly for street-level control
                  if (globeScale > 1.5) {
-                     sensitivity /= (globeScale * 0.5); // Drastically reduce speed at high zoom
+                     sensitivity /= (globeScale * 5.0); // Drastically reduce speed at high zoom
                  }
 
                  const newLat = globeCenter.lat + (-deltaY) * sensitivity;

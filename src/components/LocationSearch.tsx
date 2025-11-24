@@ -93,7 +93,7 @@ export default function LocationSearch() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="ENTER COORDINATES OR TARGET..."
-          className="w-full bg-black/60 backdrop-blur-md border border-cyan-900/50 text-cyan-100 pl-12 pr-4 py-3 rounded-none focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/50 placeholder-cyan-800/50 transition-all text-sm tracking-widest uppercase shadow-[0_0_15px_rgba(0,255,255,0.05)] focus:shadow-[0_0_20px_rgba(0,255,255,0.15)]"
+          className="w-full bg-black/60 backdrop-blur-md border border-cyan-900/50 text-cyan-100 pl-12 pr-4 py-3 rounded-none focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/50 placeholder-cyan-800/50 transition-all text-sm tracking-widest uppercase shadow-[0_0_15px_rgba(0,255,255,0.05)] focus:shadow-[0_0_20px_rgba(0,255,255,0.15)] placeholder-gray-500"
         />
         {/* Decorative Corner Accents */}
         <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-cyan-500 opacity-50" />
