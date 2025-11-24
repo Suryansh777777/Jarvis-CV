@@ -1,10 +1,8 @@
 import WebcamProcessorNeural from "@/components/WebcamProcessorNeural";
-import GlobeScene from "@/components/GlobeScene";
-import HUD from "@/components/HUD";
 import HandUI from "@/components/HandUI";
 import Link from "next/link";
 import NeuralScene from "@/components/NeuralScene";
-import { ArrowLeft } from "lucide-react";
+import { SocialLinks } from "@/components/SocialLinks";
 
 export default function Home() {
   return (
@@ -17,6 +15,8 @@ export default function Home() {
 
       {/* 3. Hand Interactions Layer */}
        <HandUI />
+
+      <SocialLinks className="top-6 left-10" />
 
       {/* Navigation Buttons */}
     <div className="absolute bottom-10 right-10 z-50 flex flex-col gap-4 items-end">
