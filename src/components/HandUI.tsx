@@ -53,7 +53,9 @@ export default function HandUI() {
   const { handUiData } = useStore();
 
   return (
-    <div className="fixed inset-0 z-30 pointer-events-none overflow-hidden">
+    <div className="absolute inset-0 pointer-events-none overflow-hidden z-50">
+
+      {/* Left Hand UI */}
       {handUiData.left.visible && (
         <div 
           className="absolute"

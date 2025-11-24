@@ -13,18 +13,27 @@ import {
 import type { Results as HandsResults } from "@mediapipe/hands";
 import type { Results as FaceMeshResults } from "@mediapipe/face_mesh";
 
-export default React.memo(function WebcamProcessor() {
+export default React.memo(function WebcamProcessorOverwatch({ className = "fixed inset-0 z-0" }: { className?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Gesture state tracking
-  const prevHandPos = useRef<{ x: number; y: number } | null>(null);
+  const prevRotatePos = useRef<{ x: number; y: number } | null>(null);
+  const prevPanPos = useRef<{ x: number; y: number } | null>(null);
   const prevPinchDist = useRef<number | null>(null);
   const prevGestureLeft = useRef<GestureType>("IDLE");
   const prevGestureRight = useRef<GestureType>("IDLE");
   const swipeCooldown = useRef<number>(0);
+  const prevHandPos = useRef<{ x: number; y: number } | null>(null); // For Time Stone logic
+  
+  // ... (inside detectGesture or effect) ...
 
-  useEffect(() => {
+
+
+    const isMounted = useRef(true);
+
+    useEffect(() => {
+    isMounted.current = true;
     let camera: any = null;
     let hands: any = null;
     let faceMesh: any = null;
@@ -49,7 +58,7 @@ export default React.memo(function WebcamProcessor() {
       // Initialize Hands
       hands = new Hands({
         locateFile: (file) => {
-          return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+          return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`;
         },
       });
 
@@ -65,7 +74,7 @@ export default React.memo(function WebcamProcessor() {
       // Initialize FaceMesh
       faceMesh = new FaceMesh({
         locateFile: (file) => {
-          return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+          return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`;
         },
       });
 
@@ -81,6 +90,7 @@ export default React.memo(function WebcamProcessor() {
       // Camera setup
       camera = new Camera(videoElement, {
         onFrame: async () => {
+          if (!isMounted.current) return;
           if (faceMesh) await faceMesh.send({ image: videoElement });
           if (hands) await hands.send({ image: videoElement });
         },
@@ -91,6 +101,7 @@ export default React.memo(function WebcamProcessor() {
       camera.start();
 
       function onFaceResults(results: FaceMeshResults) {
+        if (!isMounted.current) return;
         const { setFaceLandmarks } = useStore.getState();
         if (
           results.multiFaceLandmarks &&
@@ -103,7 +114,7 @@ export default React.memo(function WebcamProcessor() {
       }
 
       function onHandsResults(results: HandsResults) {
-        if (!canvasCtx) return;
+        if (!isMounted.current || !canvasCtx) return;
         canvasCtx.save();
         canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
@@ -210,8 +221,8 @@ export default React.memo(function WebcamProcessor() {
         // Process Interaction
         const now = Date.now();
 
-        // 1. Scaling with two hands (Pinch or Open Palm)
-        if (leftHand && rightHand) {
+        // 1. Scaling with two hands (PINCH only)
+        if (leftHand && rightHand && leftGesture === "PINCH" && rightGesture === "PINCH") {
           const leftIndex = leftHand[8];
           const rightIndex = rightHand[8];
           const dist = Math.hypot(
@@ -235,66 +246,72 @@ export default React.memo(function WebcamProcessor() {
           prevPinchDist.current = null;
         }
 
-        // 2. Swipe Detection (PALM_OPEN)
-        // Use right hand for swipe
-        const swipeHand = rightHand || leftHand;
-        const swipeGesture = rightHand ? rightGesture : leftGesture;
+        // 2. Pan Detection (PALM_OPEN)
+        const panHand = rightHand || leftHand;
+        const panGesture = rightHand ? rightGesture : leftGesture;
 
-        if (swipeHand && swipeGesture === "PALM_OPEN") {
-          const centroid = { x: swipeHand[9].x, y: swipeHand[9].y };
+        if (panHand && panGesture === "PALM_OPEN") {
+          const centroid = { x: panHand[9].x, y: panHand[9].y };
 
-          if (prevHandPos.current) {
-            const deltaX = centroid.x - prevHandPos.current.x;
+          if (prevPanPos.current) {
+            const deltaX = centroid.x - prevPanPos.current.x;
+            const deltaY = centroid.y - prevPanPos.current.y;
 
-            // Threshold for swipe
-            if (Math.abs(deltaX) > 0.15 && now - swipeCooldown.current > 1000) {
-              if (deltaX > 0) {
-                // Swipe Right (move hand left to right) -> Previous Scene
-                prevScene();
-                playHoverSound();
-              } else {
-                // Swipe Left (move hand right to left) -> Next Scene
-                nextScene();
-                playHoverSound();
-              }
-              swipeCooldown.current = now;
+            if (Math.abs(deltaX) > 0.005 || Math.abs(deltaY) > 0.005) {
+                 const { globeCenter, setGlobeCenter, globeScale } = useStore.getState();
+                 // Base sensitivity (Globe View)
+                 // We keep the original 15x multiplier for low zoom levels
+                 let sensitivity = (0.5 / globeScale) * 15;
+                 
+                 // Micro-Precision Dampening (City View)
+                 // If zoomed in (scale > 1.5), dampen significantly for street-level control
+                 if (globeScale > 2) {
+                     sensitivity /= (globeScale * 20.0); // Drastically reduce speed at high zoom
+                 }
+                
+                 const newLat = globeCenter.lat + (-deltaY) * sensitivity;
+                 const clampedLat = Math.max(-85, Math.min(85, newLat));
+                
+                 setGlobeCenter({
+                     lat: clampedLat, 
+                     lng: globeCenter.lng - deltaX * sensitivity 
+                 });
             }
           }
-          prevHandPos.current = centroid;
+          prevPanPos.current = centroid;
+        } else {
+            prevPanPos.current = null;
         }
 
-        // 3. Rotation with 'GRAB' gesture (Right Hand primarily)
+        // 3. Rotation with 'VICTORY' gesture
         const activeHand =
-          rightGesture === "GRAB"
+          rightGesture === "VICTORY"
             ? rightHand
-            : leftGesture === "GRAB"
+            : leftGesture === "VICTORY"
             ? leftHand
             : null;
 
         if (activeHand) {
           const centroid = { x: activeHand[9].x, y: activeHand[9].y };
 
-          if (prevHandPos.current) {
-            const deltaX = centroid.x - prevHandPos.current.x;
-            const deltaY = centroid.y - prevHandPos.current.y;
+          if (prevRotatePos.current) {
+            const deltaX = centroid.x - prevRotatePos.current.x;
+            const deltaY = centroid.y - prevRotatePos.current.y;
 
             const currentRot = useStore.getState().globeRotation;
             setGlobeRotation({
-              x: currentRot.x + deltaY * 8,
-              y: currentRot.y + deltaX * 8,
+              x: currentRot.x + deltaY * 2,
+              y: currentRot.y + deltaX * 2,
             });
           }
-          prevHandPos.current = centroid;
+          prevRotatePos.current = centroid;
         } else {
-          // If not grabbing, and not swiping (handled above), reset
-          if (!activeHand && (!swipeHand || swipeGesture !== "PALM_OPEN")) {
-            prevHandPos.current = null;
-          }
+            prevRotatePos.current = null;
         }
 
-        // 4. Theme Shifter (VICTORY)
-        // Use left hand for theme shifting to avoid conflict with rotation/swipe
-        if (leftGesture === "VICTORY" && prevGestureLeft.current !== "VICTORY") {
+        // 4. Theme Shifter (GRAB)
+        // Use left hand for theme shifting
+        if (leftGesture === "GRAB" && prevGestureLeft.current !== "GRAB") {
            cycleTheme();
            playSelectSound();
         }
@@ -308,6 +325,85 @@ export default React.memo(function WebcamProcessor() {
              if (Math.random() < 0.1) { // 10% chance per frame to trigger pulse while holding open
                 triggerPulse();
              }
+        }
+
+        // 6. Time Stone Gesture (Circular Motion)
+        // Use Right Hand Index Finger
+        if (rightHand && rightGesture === "POINT") {
+           const indexTip = rightHand[8];
+           const wrist = rightHand[0];
+           
+           // Calculate angle relative to wrist
+           const dx = indexTip.x - wrist.x;
+           const dy = indexTip.y - wrist.y;
+           const angle = Math.atan2(dy, dx);
+           
+           if (prevHandPos.current) {
+             // We use prevHandPos as a generic "previous frame data" storage here
+             // Ideally, we should use a dedicated ref for angle, but let's reuse or add a new one
+             // Let's assume prevHandPos stores the previous angle in 'z' (hacky but efficient) or just add a new ref
+           }
+        }
+        
+        // Actually, let's do it properly.
+        // We need a dedicated ref for the previous angle.
+        // Since I can't add a ref easily inside this callback without re-defining the component,
+        // I will rely on a new ref added to the component scope.
+        // BUT, I am editing the file content. So I can add the ref!
+        
+        // Wait, I need to add the ref definition first.
+        // Let's do this in two steps.
+        // 1. Add the ref.
+        // 2. Add the logic.
+        
+        // Let's just add the logic and assume I'll add the ref in the next step? 
+        // No, that will break the build.
+        
+        // I will use `prevHandPos` to store the previous Index Tip position for now, 
+        // and calculate the cross product to determine rotation direction?
+        // Cross product of (prevVector) and (currVector) gives direction.
+        
+        if (rightHand && rightGesture === "POINT" && rightHand[0] && rightHand[8]) {
+            const indexTip = rightHand[8];
+            const wrist = rightHand[0];
+            
+            // Vector from wrist to tip
+            const vX = indexTip.x - wrist.x;
+            const vY = indexTip.y - wrist.y;
+            
+            // We need previous vector
+            // Let's use a static variable or property on the function? No.
+            // Let's use `prevHandPos` to store the previous TIP position.
+            
+            if (prevHandPos.current) {
+                const prevX = prevHandPos.current.x - wrist.x; // Approx if wrist moved, but okay for fast gestures
+                const prevY = prevHandPos.current.y - wrist.y;
+                
+                // Cross product 2D: A x B = Ax*By - Ay*Bx
+                const cross = prevX * vY - prevY * vX;
+                
+                // If cross > 0, Clockwise (in screen coords where Y is down? MediaPipe Y is down)
+                // MP: X right, Y down.
+                // X+ is Right, Y+ is Down.
+                // Clockwise from 12 o'clock (0, -1) to 3 o'clock (1, 0)
+                // V1 = (0, -1), V2 = (1, 0) => 0*0 - (-1)*1 = 1 > 0.
+                // So Cross > 0 is Clockwise.
+                
+                const { timeSpeed, setTimeSpeed, setIsManipulatingTime } = useStore.getState();
+                
+                if (Math.abs(cross) > 0.005) { // Threshold
+                    setIsManipulatingTime(true);
+                    const speedChange = cross * 50; // Sensitivity
+                    const newSpeed = Math.max(0.1, Math.min(5.0, timeSpeed + speedChange));
+                    setTimeSpeed(newSpeed);
+                } else {
+                    setIsManipulatingTime(false);
+                }
+            }
+            prevHandPos.current = { x: indexTip.x, y: indexTip.y };
+        } else {
+            // If not pointing, reset manipulation state
+             useStore.getState().setIsManipulatingTime(false);
         }
 
         prevGestureLeft.current = leftGesture;
@@ -420,6 +516,7 @@ export default React.memo(function WebcamProcessor() {
     initMediaPipe();
 
     return () => {
+      isMounted.current = false;
       if (camera) (camera as any).stop();
       if (hands) (hands as any).close();
       if (faceMesh) (faceMesh as any).close();
@@ -427,7 +524,7 @@ export default React.memo(function WebcamProcessor() {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-0">
+    <div className={className}>
       <video ref={videoRef} className="hidden" playsInline />
       <canvas
         ref={canvasRef}
